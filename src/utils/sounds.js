@@ -264,6 +264,45 @@ class CameraSounds {
     this.triggerHaptic([80, 60, 80]);
   }
 
+  // Odometer roll sound - Smooth slot machine style ticks
+  playOdometerRoll() {
+    this.init();
+    const ctx = this.audioContext;
+    const now = ctx.currentTime;
+
+    // Create a sequence of rapid ticks
+    const tickCount = 3;
+    for (let i = 0; i < tickCount; i++) {
+      const bufferSize = ctx.sampleRate * 0.005;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+
+      // Generate crisp mechanical click
+      for (let j = 0; j < bufferSize; j++) {
+        const decay = Math.exp(-j / (bufferSize * 0.1));
+        data[j] = (Math.random() * 2 - 1) * decay * 0.3;
+      }
+
+      const source = ctx.createBufferSource();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      filter.type = 'highpass';
+      filter.frequency.value = 1200 + (Math.random() * 400); // Slight variation
+      filter.Q.value = 1;
+
+      source.buffer = buffer;
+      
+      // Staggered timing with varying volume
+      const startTime = now + (i * 0.03);
+      gain.gain.setValueAtTime(0.15 - (i * 0.03), startTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, startTime + 0.01);
+
+      source.connect(filter).connect(gain).connect(ctx.destination);
+      source.start(startTime);
+    }
+  }
+
   // Initial camera load/wind sound - Film loading mechanism
   playInitialWind() {
     this.init();

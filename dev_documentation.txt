@@ -1,0 +1,311 @@
+# Development Documentation
+
+## 2025-11-25 15:45:11 IST - Odometer Component Implementation
+
+### Changes Made:
+- **Removed**: Progress bar component from PhotoCounter
+- **Added**: Retro-style odometer component with smooth rolling digit animation
+
+### Technical Details:
+
+#### Modified Files:
+- `src/components/PhotoCounter.jsx`
+
+#### New Components:
+1. **OdometerDigit Component**:
+   - Individual digit component with smooth rolling animation
+   - Uses Framer Motion for smooth transitions
+   - Implements mechanical bounce easing for retro feel
+   - Supports directional rolling (up/down) based on value changes
+   - Staggered delay per digit for cascading effect
+
+2. **Odometer Component**:
+   - Displays used shots count in odometer format (e.g., "01 / 10")
+   - Tracks previous value for smooth rolling transitions
+   - Styled with retro mechanical aesthetic:
+     - Dark panel background with border
+     - Monospace font for mechanical look
+     - Vertical separator line for retro feel
+     - Vintage shadow effect
+
+#### Features:
+- Smooth rolling animation when value changes
+- Retro mechanical bounce easing curve
+- Staggered animation delays for multi-digit numbers
+- Color changes based on low shot count (warning color)
+- Removed progress bar as requested
+- Maintains existing "SHOTS REMAINING" display
+
+#### Animation Details:
+- Duration: 0.75 seconds per digit
+- Easing: [0.34, 1.56, 0.64, 1] (mechanical bounce)
+- Delay: 0.05s per digit position for cascading effect
+- Direction: Automatically determines up/down based on value change
+
+### Testing:
+- Verified no linting errors
+- Component maintains backward compatibility
+- Animation triggers on value changes
+- Styling matches existing design system
+
+## 2025-11-25 15:59:07 IST - Camera Fix & Odometer Size Increase
+
+### Changes Made:
+- **Fixed**: Camera initialization and error handling issues
+- **Enhanced**: Video readiness detection with timeout and multiple event listeners
+- **Improved**: Error messages for better user feedback on permission issues
+- **Increased**: Odometer window size for better visibility
+
+### Technical Details:
+
+#### Modified Files:
+- `src/hooks/useCamera.js`
+- `src/components/PhotoCounter.jsx`
+
+#### Camera Fixes:
+1. **Improved Error Handling**:
+   - Added specific error messages for different error types:
+     - `NotAllowedError`: Permission denied message
+     - `NotFoundError`: No camera found message
+     - `NotReadableError`: Camera in use by another app message
+   - Better cleanup on errors to prevent stream leaks
+
+2. **Enhanced Video Readiness Detection**:
+   - Added timeout (10 seconds) to prevent infinite waiting
+   - Added `loadedmetadata` event listener for faster detection
+   - Improved cleanup of event listeners
+   - Better handling of edge cases where video might already be ready
+
+3. **Stream Management**:
+   - Properly stop existing streams before starting new ones
+   - Clear error state before attempting new camera access
+   - Added delay after setting srcObject for stream to initialize
+
+#### Odometer Size Increase:
+- Increased digit container: `h-[1.4em]` → `h-[1.6em]`, `w-[0.8em]` → `w-[1em]`
+- Increased font size: `text-3xl` → `text-4xl`
+- Increased padding: `px-4 py-3` → `px-6 py-4`
+- Increased gap between digits: `gap-1` → `gap-2`
+- Increased outer padding: `p-4` → `p-5`
+- Changed border radius: `rounded-lg` → `rounded-xl` for smoother look
+
+### Testing:
+- Verified no linting errors
+- Camera error handling improved with specific messages
+- Odometer is now more visible and prominent
+- All animations and sounds still work correctly
+
+## 2025-11-26 10:12:37 IST - Supabase Authentication & Photo Book Implementation
+
+### Overview:
+Full integration of Supabase for user authentication, cloud photo storage, and a shared photo book gallery.
+
+### Database Schema Created:
+
+#### Tables:
+1. **users_profile**:
+   - `id` (UUID, references auth.users)
+   - `display_name` (TEXT)
+   - `email` (TEXT)
+   - `photo_count` (INTEGER, 0-10)
+   - `created_at`, `updated_at` (TIMESTAMP)
+   - RLS policies for read/insert/update
+
+2. **photos**:
+   - `id` (UUID)
+   - `user_id` (UUID, references auth.users)
+   - `storage_path` (TEXT)
+   - `public_url` (TEXT)
+   - `event_name` (TEXT)
+   - `created_at` (TIMESTAMP)
+   - Triggers to auto-increment/decrement photo_count
+
+#### Storage:
+- `photos` bucket with public read access
+- Policies for authenticated user uploads to their own folder
+
+### New Files Created:
+
+1. **`src/lib/supabase.js`**:
+   - Supabase client initialization
+   - Helper functions: uploadPhoto, getUserPhotoCount, getAllPhotos, getUserPhotos, deletePhoto
+
+2. **`src/contexts/AuthContext.jsx`**:
+   - Auth state management (user, profile, loading)
+   - signUp, signIn, signOut methods
+   - Photo count tracking and refresh
+
+3. **`src/components/Auth.jsx`**:
+   - Beautiful login/signup UI
+   - Email + password authentication
+   - Display name for new users
+   - Error/success message handling
+
+4. **`src/components/PhotoBook.jsx`**:
+   - Displays all photos from all users
+   - Grid layout with photographer name and timestamp
+   - Full-screen photo viewer with navigation
+   - Slideshow mode with auto-advance
+   - Loading and empty states
+
+### Modified Files:
+
+1. **`src/utils/storage.js`**:
+   - New `createPhotoStorage()` factory for Supabase integration
+   - Kept legacy `photoStorage` for offline fallback
+
+2. **`src/components/Camera.jsx`**:
+   - Integrated with AuthContext
+   - Uses Supabase storage for photo uploads
+   - Shows user profile info
+   - Photo Book navigation button
+   - Upload progress indication
+
+3. **`src/App.jsx`**:
+   - Wrapped with AuthProvider
+   - Auth gate (shows login if not authenticated)
+   - View routing: camera, gallery, photobook
+
+### Features:
+- Email/password authentication
+- Auto-profile creation on signup
+- 10 photos per user limit (enforced in DB)
+- Cloud storage for photos
+- Shared photo book visible to all users
+- Slideshow mode with sound effects
+- Real-time photo count sync
+
+### Supabase Project:
+- Project: Zapcom_Offsite
+- URL: https://ptqrfhvqyzqkdosnfkhg.supabase.co
+- Region: ap-southeast-2
+
+### Testing:
+- All linting errors resolved
+- Database migrations applied successfully
+- Storage bucket created with proper policies
+- Auth flow working with email/password
+
+## 2025-11-26 10:25:00 IST - PhotoBook Loading Fix
+
+### Issue:
+Photo Book was stuck on "Loading photos..." indefinitely.
+
+### Root Cause:
+The `getAllPhotos()` function was using Supabase's embedded resource syntax to join `photos` with `users_profile`, but PostgREST couldn't detect the relationship automatically because:
+- `photos.user_id` referenced `auth.users(id)`
+- `users_profile.id` also referenced `auth.users(id)`
+- No direct FK existed between `photos` and `users_profile`
+
+### Fix:
+1. Added direct foreign key: `photos.user_id -> users_profile.id`
+2. Added fallback mechanism in `getAllPhotos()` that fetches photos and profiles separately if the join fails
+3. Added error state handling to PhotoBook component
+
+### Files Modified:
+- `src/lib/supabase.js` - Added robust fallback in getAllPhotos()
+- `src/components/PhotoBook.jsx` - Added error state and retry button
+
+### Database Migration:
+- `add_photos_to_users_profile_fk` - Added FK constraint for proper joins
+
+## 2025-11-26 21:38:00 IST - Auth getSession Timeout Warning Fix
+
+### Issue:
+Console warning `"[Auth] getSession timed out, proceeding without session"` appearing after sign-in, even though authentication was working correctly.
+
+### Root Cause:
+The `initAuth` function in `AuthContext.jsx` wrapped `supabase.auth.getSession()` in a `Promise.race` with a 3-second timeout. If network latency, Supabase project cold start, or browser load caused `getSession()` to take slightly longer than 3 seconds on initial mount, the custom timeout would fire and log the warning—even though Supabase would finish the request shortly after and `onAuthStateChange` would still establish the session correctly.
+
+### Investigation:
+- Used Supabase MCP to query `auth` and `api` logs for project `Zapcom_Offsite`
+- Logs showed all `/auth/v1/token` and `/auth/v1/user` requests returning `200` status with sub-second durations
+- No server-side timeouts or errors were occurring
+- The warning was entirely client-side due to the artificial 3s timeout racing against `getSession()`
+
+### Fix:
+Removed the manual `Promise.race` timeout wrapper and made a direct call to `supabase.auth.getSession()`, relying on Supabase's own behavior. The existing error handling and background profile/photo-count loading were preserved.
+
+### Files Modified:
+- `src/contexts/AuthContext.jsx`
+  - Removed `timeoutPromise` and `Promise.race` logic
+  - Simplified `initAuth` to directly await `supabase.auth.getSession()`
+  - Kept all console logging for debugging
+  - Removed the `"[Auth] getSession timed out, proceeding without session"` warning branch
+
+### Code Change Summary:
+```jsx
+// Before (with timeout):
+const sessionPromise = supabase.auth.getSession();
+const timeoutPromise = new Promise((_, reject) => 
+  setTimeout(() => reject(new Error('getSession timeout')), 3000)
+);
+const result = await Promise.race([sessionPromise, timeoutPromise]);
+
+// After (direct call):
+const { data, error } = await supabase.auth.getSession();
+const session = data?.session ?? null;
+```
+
+### Testing:
+- Verified app loads correctly at http://localhost:5173/
+- Console logs show proper auth flow:
+  - `[Auth] Starting initAuth...`
+  - `[Auth] Calling getSession...`
+  - `[Auth] onAuthStateChange: SIGNED_IN` (or `TOKEN_REFRESHED`)
+  - `[Auth] Fetching profile and photo count for user: ...`
+- **Confirmed: No more `"[Auth] getSession timed out, proceeding without session"` warning**
+- Auth flow continues to work correctly with existing sessions and new sign-ins
+
+## 2025-11-26 21:48:00 IST - Auth Loading State Fix
+
+### Issue:
+After removing the timeout, the app was stuck on the loading screen even though auth was completing successfully.
+
+### Root Cause:
+Race condition between `initAuth()` and `onAuthStateChange`:
+1. `initAuth()` was called first, then `onAuthStateChange` listener was set up
+2. Supabase fires `onAuthStateChange` immediately when there's an existing session
+3. In React StrictMode, the component mounts/unmounts twice
+4. The `mounted` check in `initAuth` would fail because StrictMode unmounted the first instance
+5. `loading` was never set to `false`
+
+### Fix:
+Refactored the auth initialization to:
+1. Set up `onAuthStateChange` listener FIRST (before calling `initAuth`)
+2. Created a shared `handleSession()` helper function used by both paths
+3. `onAuthStateChange` now handles setting `loading=false` for existing sessions
+4. `initAuth` only sets `loading=false` if there's NO session (for the logged-out case)
+
+### Code Change Summary:
+```jsx
+// New shared handler
+const handleSession = async (session, source) => {
+  setUser(session?.user ?? null);
+  setLoading(false);  // Always set loading=false here
+  // ... fetch profile and photo count
+};
+
+// Set up listener FIRST
+const { data: { subscription } } = supabase.auth.onAuthStateChange(
+  async (event, session) => {
+    await handleSession(session, `onAuthStateChange:${event}`);
+  }
+);
+
+// Then call getSession (only sets loading=false if no session)
+const initAuth = async () => {
+  const { data, error } = await supabase.auth.getSession();
+  if (!data?.session) {
+    setLoading(false);  // Only for logged-out case
+  }
+};
+```
+
+### Files Modified:
+- `src/contexts/AuthContext.jsx`
+
+### Testing:
+- App loads correctly and shows camera screen
+- User profile displays correctly (name, remaining shots)
+- Console shows proper auth flow with all events firing correctly

@@ -1,28 +1,59 @@
 import { useState } from 'react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { Auth } from './components/Auth';
 import { LoadingScreen } from './components/LoadingScreen';
 import { Camera } from './components/Camera';
 import { Gallery } from './components/Gallery';
+import { PhotoBook } from './components/PhotoBook';
 
-function App() {
+function AppContent() {
+  const { user, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
-  const [showGallery, setShowGallery] = useState(false);
+  const [currentView, setCurrentView] = useState('camera'); // 'camera' | 'gallery' | 'photobook'
 
+  // Show loading screen on first load
+  if (isLoading) {
+    return <LoadingScreen onComplete={() => setIsLoading(false)} />;
+  }
+
+  // Show auth loading
+  if (loading) {
+    return (
+      <div className="w-full h-full bg-night-base flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-night-accent border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Show auth screen if not logged in
+  if (!user) {
+    return <Auth />;
+  }
+
+  // Main app views
   return (
     <div className="w-full h-full">
-      {isLoading ? (
-        <LoadingScreen onComplete={() => setIsLoading(false)} />
-      ) : showGallery ? (
-        <Gallery onClose={() => setShowGallery(false)} />
-      ) : (
+      {currentView === 'camera' && (
         <Camera
-          onPhotoTaken={(count) => {
-            // Optional: Do something when photo is taken
-            console.log(`Photo taken! Total: ${count}`);
-          }}
-          onViewGallery={() => setShowGallery(true)}
+          onViewGallery={() => setCurrentView('gallery')}
+          onViewPhotoBook={() => setCurrentView('photobook')}
         />
       )}
+      {currentView === 'gallery' && (
+        <Gallery onClose={() => setCurrentView('camera')} />
+      )}
+      {currentView === 'photobook' && (
+        <PhotoBook onClose={() => setCurrentView('camera')} />
+      )}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 
