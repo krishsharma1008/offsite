@@ -309,3 +309,25 @@ const initAuth = async () => {
 - App loads correctly and shows camera screen
 - User profile displays correctly (name, remaining shots)
 - Console shows proper auth flow with all events firing correctly
+
+## 2025-11-26 21:55:00 IST - PhotoCounter Styling Simplification
+
+### Changes Made:
+- Simplified OdometerDigit component styling
+- Removed blur effects and complex drop shadows
+- Replaced Tailwind classes with inline styles for more predictable rendering
+- Cleaned up Odometer container styling with simpler gradient background
+- Removed unused `maxValue` prop from Odometer component
+
+### Files Modified:
+- `src/components/PhotoCounter.jsx`
+
+### Technical Details:
+- Digit container: Fixed dimensions (32x48px) with flex centering
+- Font: System fonts (-apple-system, SF Pro Display) at 36px bold
+- Animation: Simplified spring animation without blur transitions
+- Container: Cleaner gradient background with subtle box shadow and backdrop blur
+
+### Git:
+- Commit: `f6599db` - "refactor(PhotoCounter): simplify styling and animation logic"
+- Pushed to: `origin/main`
