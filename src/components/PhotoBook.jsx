@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getAllPhotos } from '../lib/supabase';
 import { cameraSounds } from '../utils/sounds';
+import { downloadPhotosAsZip, downloadPhotosAsPdf } from '../utils/downloads';
 
 // Card animation variants for subtle entry
 const cardVariants = {
@@ -35,7 +36,12 @@ export function PhotoBook({ onClose }) {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [isSlideshow, setIsSlideshow] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0, message: '' });
+  const [downloadError, setDownloadError] = useState(null);
   const scrollRef = useRef(null);
+  const downloadMenuRef = useRef(null);
 
   // Fetch all photos
   useEffect(() => {
@@ -84,6 +90,65 @@ export function PhotoBook({ onClose }) {
       document.body.style.overflow = '';
     };
   }, [selectedPhoto, isSlideshow]);
+
+  // Close download menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(event.target)) {
+        setDownloadMenuOpen(false);
+      }
+    };
+    if (downloadMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [downloadMenuOpen]);
+
+  // Handle ZIP download
+  const handleDownloadZip = async () => {
+    if (photos.length === 0 || downloading) return;
+    
+    setDownloadMenuOpen(false);
+    setDownloading(true);
+    setDownloadError(null);
+    setDownloadProgress({ current: 0, total: photos.length, message: 'Preparing download...' });
+
+    try {
+      await downloadPhotosAsZip(photos, (current, total, message) => {
+        setDownloadProgress({ current, total, message: message || `Downloading ${current} of ${total} photos...` });
+      });
+      setDownloading(false);
+      setDownloadProgress({ current: 0, total: 0, message: '' });
+    } catch (err) {
+      console.error('Download ZIP error:', err);
+      setDownloadError(err.message || 'Failed to download photos. Please try again.');
+      setDownloading(false);
+      setDownloadProgress({ current: 0, total: 0, message: '' });
+    }
+  };
+
+  // Handle PDF download
+  const handleDownloadPdf = async () => {
+    if (photos.length === 0 || downloading) return;
+    
+    setDownloadMenuOpen(false);
+    setDownloading(true);
+    setDownloadError(null);
+    setDownloadProgress({ current: 0, total: photos.length, message: 'Preparing PDF...' });
+
+    try {
+      await downloadPhotosAsPdf(photos, (current, total, message) => {
+        setDownloadProgress({ current, total, message: message || `Processing ${current} of ${total} photos...` });
+      });
+      setDownloading(false);
+      setDownloadProgress({ current: 0, total: 0, message: '' });
+    } catch (err) {
+      console.error('Download PDF error:', err);
+      setDownloadError(err.message || 'Failed to create PDF. Please try again.');
+      setDownloading(false);
+      setDownloadProgress({ current: 0, total: 0, message: '' });
+    }
+  };
 
   const handlePhotoClick = (photo, index) => {
     setSelectedPhoto(photo);
@@ -187,30 +252,90 @@ export function PhotoBook({ onClose }) {
             </p>
           </div>
 
-          {/* Slideshow Toggle */}
-          <button
-            onClick={() => {
-              setIsSlideshow(!isSlideshow);
-              cameraSounds.playCounterClick();
-            }}
-            aria-label={isSlideshow ? 'Stop slideshow' : 'Start slideshow'}
-            className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all ${
-              isSlideshow
-                ? 'bg-white text-black border-white'
-                : 'bg-white/[0.06] hover:bg-white/10 border-white/[0.08]'
-            }`}
-          >
-            {isSlideshow ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="6" y="4" width="4" height="16" rx="1"/>
-                <rect x="14" y="4" width="4" height="16" rx="1"/>
-              </svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5.14v14l11-7-11-7z"/>
-              </svg>
+          {/* Header Actions */}
+          <div className="flex items-center gap-2">
+            {/* Download Menu */}
+            {photos.length > 0 && (
+              <div className="relative" ref={downloadMenuRef}>
+                <button
+                  onClick={() => setDownloadMenuOpen(!downloadMenuOpen)}
+                  disabled={downloading}
+                  aria-label="Download photo book"
+                  className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all ${
+                    downloading
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'bg-white/[0.06] hover:bg-white/10 border-white/[0.08]'
+                  }`}
+                >
+                  {downloading ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                    </svg>
+                  )}
+                </button>
+
+                {/* Download Menu Dropdown */}
+                <AnimatePresence>
+                  {downloadMenuOpen && !downloading && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-12 w-48 bg-[#1a1a1c] border border-white/[0.1] rounded-xl shadow-2xl overflow-hidden z-50"
+                    >
+                      <button
+                        onClick={handleDownloadZip}
+                        className="w-full px-4 py-3 text-left text-sm hover:bg-white/[0.05] transition-colors flex items-center gap-3"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                        </svg>
+                        <span>Download as ZIP</span>
+                      </button>
+                      <button
+                        onClick={handleDownloadPdf}
+                        className="w-full px-4 py-3 text-left text-sm hover:bg-white/[0.05] transition-colors flex items-center gap-3 border-t border-white/[0.05]"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                          <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                        </svg>
+                        <span>Download as PDF</span>
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             )}
-          </button>
+
+            {/* Slideshow Toggle */}
+            <button
+              onClick={() => {
+                setIsSlideshow(!isSlideshow);
+                cameraSounds.playCounterClick();
+              }}
+              aria-label={isSlideshow ? 'Stop slideshow' : 'Start slideshow'}
+              className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all ${
+                isSlideshow
+                  ? 'bg-white text-black border-white'
+                  : 'bg-white/[0.06] hover:bg-white/10 border-white/[0.08]'
+              }`}
+            >
+              {isSlideshow ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" rx="1"/>
+                  <rect x="14" y="4" width="4" height="16" rx="1"/>
+                </svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M8 5.14v14l11-7-11-7z"/>
+                </svg>
+              )}
+            </button>
+          </div>
         </div>
       </header>
 
@@ -354,6 +479,72 @@ export function PhotoBook({ onClose }) {
                 <p className="text-[10px] text-white/30 mt-2">{currentIndex + 1} of {photos.length}</p>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Download Progress Overlay */}
+      <AnimatePresence>
+        {downloading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center"
+          >
+            <div className="bg-[#1a1a1c] border border-white/[0.1] rounded-2xl p-6 sm:p-8 max-w-sm w-full mx-4">
+              <div className="text-center">
+                <div className="w-12 h-12 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Downloading Photo Book</h3>
+                <p className="text-sm text-white/60 mb-4">
+                  {downloadProgress.message || `Processing ${downloadProgress.current} of ${downloadProgress.total}...`}
+                </p>
+                {downloadProgress.total > 0 && (
+                  <div className="w-full bg-white/[0.1] rounded-full h-2 overflow-hidden mb-2">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(downloadProgress.current / downloadProgress.total) * 100}%` }}
+                      transition={{ duration: 0.3 }}
+                      className="h-full bg-white rounded-full"
+                    />
+                  </div>
+                )}
+                <p className="text-xs text-white/40">
+                  {downloadProgress.current} / {downloadProgress.total} photos
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Download Error Toast */}
+      <AnimatePresence>
+        {downloadError && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] bg-red-500/90 backdrop-blur-sm text-white px-4 py-3 rounded-xl shadow-2xl max-w-sm w-full mx-4"
+          >
+            <div className="flex items-center gap-3">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 8v4M12 16h.01"/>
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm font-medium">Download Failed</p>
+                <p className="text-xs text-white/80 mt-0.5">{downloadError}</p>
+              </div>
+              <button
+                onClick={() => setDownloadError(null)}
+                className="text-white/60 hover:text-white"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M18 6L6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

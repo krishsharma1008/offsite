@@ -331,3 +331,103 @@ const initAuth = async () => {
 ### Git:
 - Commit: `f6599db` - "refactor(PhotoCounter): simplify styling and animation logic"
 - Pushed to: `origin/main`
+
+## 2025-11-27 09:30:00 IST - Photo Book Responsive Redesign & Download Functionality
+
+### Overview:
+Complete redesign of the Photo Book page to be fully scrollable, mobile-friendly, with smooth animations, and added download functionality for exporting all photos as ZIP or PDF.
+
+### Changes Made:
+
+#### 1. Layout & Responsiveness
+- Refactored PhotoBook to use fixed full-screen layout with sticky header and scrollable content area
+- Implemented responsive grid: 2 columns (mobile), 3 (tablet), 4 (desktop), 5 (large screens)
+- Added proper padding and spacing that adapts to screen size
+- Ensured scrollable content area doesn't conflict with global overflow:hidden styles
+
+#### 2. Visual Design Improvements
+- Redesigned photo cards with cleaner, minimal aesthetic
+- Improved typography and spacing for photographer names and timestamps
+- Enhanced hover/tap animations with subtle scale effects
+- Better contrast and readability for photo info overlays
+- Refined header with better mobile-friendly button sizes
+
+#### 3. Animations
+- Added subtle card entry animations with staggered delays (0.04s per card)
+- Smooth transitions for full-screen viewer and slideshow overlays
+- Enhanced hover states with gentle scale transforms
+- Improved overlay transitions with refined easing curves
+
+#### 4. Download Functionality
+- **ZIP Download**: Downloads all photos as individual image files in a ZIP archive
+  - Descriptive filenames: `{photographer}_{date}_{index}.jpg`
+  - Progress indicator showing current/total photos
+  - Error handling for failed photo fetches
+- **PDF Download**: Creates a PDF document with all photos
+  - Cover page with title and photo count
+  - 2 photos per page in portrait layout
+  - Photographer name and timestamp for each photo
+  - Progress indicator during PDF generation
+- **UI Features**:
+  - Download button in header with dropdown menu
+  - Progress overlay with percentage and status message
+  - Error toast notifications for failed downloads
+  - Disabled state during downloads to prevent multiple simultaneous downloads
+
+### New Files Created:
+- `src/utils/downloads.js`: Utility functions for ZIP and PDF generation
+  - `downloadPhotosAsZip()`: Fetches all photos, creates ZIP archive
+  - `downloadPhotosAsPdf()`: Generates PDF with photo grid layout
+  - Helper functions for filename sanitization and date formatting
+
+### Files Modified:
+- `src/components/PhotoBook.jsx`:
+  - Complete layout restructure for scrollability
+  - Responsive grid implementation
+  - Download button and menu UI
+  - Download state management (loading, progress, errors)
+  - Progress overlay and error toast components
+  - Enhanced animations throughout
+
+### Dependencies Added:
+- `jszip`: For creating ZIP archives
+- `jspdf`: For PDF generation
+- `html2canvas`: For converting images to canvas (used by jspdf)
+
+### Technical Details:
+
+#### Download Implementation:
+- ZIP: Uses JSZip to fetch each photo URL, convert to blob, and package into ZIP
+- PDF: Uses jsPDF to create multi-page document with photos arranged in grid
+- Progress tracking: Callback-based progress updates for both download types
+- Error handling: Graceful error handling with user-friendly messages
+- Filename sanitization: Removes invalid characters from photographer names
+
+#### Responsive Breakpoints:
+- Mobile (< 640px): 2 columns, smaller gaps, reduced padding
+- Tablet (640px - 1024px): 3 columns, medium gaps
+- Desktop (1024px - 1280px): 4 columns, larger gaps
+- Large (> 1280px): 5 columns, maximum spacing
+
+#### Animation Details:
+- Card entry: 0.35s duration with staggered 0.04s delays
+- Hover scale: 1.02x with 0.2s transition
+- Tap scale: 0.98x for tactile feedback
+- Overlay transitions: 0.28s with smooth easing
+
+### Testing:
+- Verified scrollability on mobile, tablet, and desktop
+- Tested download functionality with various photo counts
+- Confirmed progress indicators work correctly
+- Verified error handling for network failures
+- Tested responsive grid at multiple breakpoints
+- Confirmed animations are smooth and performant
+- No linting errors introduced
+
+### User Experience Improvements:
+- Fully scrollable photo grid (no more fixed viewport issues)
+- Mobile-friendly touch targets and spacing
+- Clear visual feedback during downloads
+- Professional PDF layout with cover page
+- Organized ZIP files with descriptive names
+- Smooth, subtle animations that enhance without distracting
