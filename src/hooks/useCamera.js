@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { getFilterById } from '../utils/filters';
 
 // Optimal resolution for mobile sharing (balances quality and upload speed)
 const TARGET_MAX_DIMENSION = 1280; // Max width or height
@@ -8,6 +9,8 @@ export function useCamera() {
   const [stream, setStream] = useState(null);
   const [error, setError] = useState(null);
   const [isReady, setIsReady] = useState(false);
+  const [facingMode, setFacingMode] = useState('environment'); // 'environment' (back) or 'user' (front)
+  const [isSwitching, setIsSwitching] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -115,7 +118,7 @@ export function useCamera() {
     });
   };
 
-  const startCamera = async () => {
+  const startCamera = async (requestedFacingMode = null) => {
     if (!navigator?.mediaDevices?.getUserMedia) {
       setError('Camera is not supported in this browser or context.');
       setIsReady(false);
@@ -133,14 +136,20 @@ export function useCamera() {
       setError(null);
       setIsReady(false);
 
+      // Use requested facing mode or current facing mode
+      const targetFacingMode = requestedFacingMode || facingMode;
+
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment',
+          facingMode: targetFacingMode,
           width: { ideal: 1920 },
           height: { ideal: 1080 }
         },
         audio: false
       });
+
+      // Update facing mode state
+      setFacingMode(targetFacingMode);
 
       setStream(mediaStream);
 
@@ -194,6 +203,40 @@ export function useCamera() {
     }
   };
 
+  // Switch between front and back camera
+  const switchCamera = async () => {
+    if (isSwitching || !isReady) {
+      return; // Prevent rapid switching
+    }
+
+    setIsSwitching(true);
+    const newFacingMode = facingMode === 'environment' ? 'user' : 'environment';
+    
+    try {
+      // Stop current stream
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        setStream(null);
+      }
+
+      setIsReady(false);
+
+      // Start camera with new facing mode
+      await startCamera(newFacingMode);
+    } catch (err) {
+      console.error('Error switching camera:', err);
+      // If switching fails, try to restore previous camera
+      try {
+        await startCamera(facingMode);
+      } catch (restoreErr) {
+        console.error('Error restoring camera:', restoreErr);
+        setError('Unable to switch camera. Please try again.');
+      }
+    } finally {
+      setIsSwitching(false);
+    }
+  };
+
   // Stop camera
   const stopCamera = () => {
     if (stream) {
@@ -203,8 +246,8 @@ export function useCamera() {
     }
   };
 
-  // Capture photo from video stream
-  const capturePhoto = () => {
+  // Capture photo from video stream with optional filter
+  const capturePhoto = (filterId = 'original') => {
     if (!videoRef.current || !isReady) return null;
 
     const video = videoRef.current;
@@ -243,8 +286,10 @@ export function useCamera() {
     // Draw video frame to canvas
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Apply vintage effects
-    applyVintageEffect(ctx, canvas.width, canvas.height);
+    // Apply selected filter effect
+    const filter = getFilterById(filterId);
+    console.log(`[Camera] Applying filter: ${filter.name}`);
+    filter.apply(ctx, canvas.width, canvas.height);
 
     // Convert to data URL
     const dataUrl = canvas.toDataURL('image/jpeg', JPEG_QUALITY);
@@ -252,42 +297,10 @@ export function useCamera() {
       originalDimensions: `${videoWidth}x${videoHeight}`,
       compressedDimensions: `${canvas.width}x${canvas.height}`,
       dataUrlSize: `${Math.round(dataUrl.length / 1024)}KB`,
-      quality: JPEG_QUALITY
+      quality: JPEG_QUALITY,
+      filter: filter.name
     });
     return dataUrl;
-  };
-
-  // Apply vintage photo effects
-  const applyVintageEffect = (ctx, width, height) => {
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const data = imageData.data;
-
-    // Apply warm vintage tone and slight grain
-    for (let i = 0; i < data.length; i += 4) {
-      // Warm vintage color adjustment
-      data[i] = Math.min(255, data[i] * 1.1);     // Red +10%
-      data[i + 1] = Math.min(255, data[i + 1] * 1.05); // Green +5%
-      data[i + 2] = Math.min(255, data[i + 2] * 0.9);  // Blue -10%
-
-      // Slight grain
-      const noise = (Math.random() - 0.5) * 15;
-      data[i] += noise;
-      data[i + 1] += noise;
-      data[i + 2] += noise;
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-
-    // Add vignette
-    const gradient = ctx.createRadialGradient(
-      width / 2, height / 2, 0,
-      width / 2, height / 2, width * 0.7
-    );
-    gradient.addColorStop(0, 'rgba(0,0,0,0)');
-    gradient.addColorStop(0.7, 'rgba(0,0,0,0)');
-    gradient.addColorStop(1, 'rgba(0,0,0,0.4)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
   };
 
   // Cleanup on unmount
@@ -303,8 +316,11 @@ export function useCamera() {
     stream,
     error,
     isReady,
+    facingMode,
+    isSwitching,
     startCamera,
     stopCamera,
+    switchCamera,
     capturePhoto
   };
 }

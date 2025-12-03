@@ -2,3 +2,6 @@
 // We only use images, so this stub prevents import errors
 export default {};
 
+
+
+

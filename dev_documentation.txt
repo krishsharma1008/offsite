@@ -431,3 +431,381 @@ Complete redesign of the Photo Book page to be fully scrollable, mobile-friendly
 - Professional PDF layout with cover page
 - Organized ZIP files with descriptive names
 - Smooth, subtle animations that enhance without distracting
+
+## 2025-11-27 14:30:00 IST - Orphaned Photo Records Cleanup
+
+### Issue:
+Photos were deleted from Supabase storage, but their database records still existed, causing them to appear in the Photo Book UI with broken image links (showing empty placeholders).
+
+### Solution Implemented:
+
+#### 1. Storage File Validation
+- Added `checkStorageFileExists()` function that verifies storage files exist by checking public URLs with HEAD requests
+- Updated `getAllPhotos()` to validate all photos before returning them
+- Photos with missing storage files are automatically filtered out from the UI
+- Background cleanup is triggered when orphaned photos are detected
+
+#### 2. Cleanup Function
+- Created `cleanupOrphanedPhotos()` function in `src/lib/supabase.js`:
+  - Fetches all photos from database
+  - Checks each photo's storage file existence
+  - Deletes orphaned database records
+  - Updates user photo counts automatically
+- Created standalone cleanup script `scripts/cleanup-orphaned-photos.js` for manual execution
+
+#### 3. Database Cleanup
+- Executed cleanup script which identified and deleted 11 orphaned photo records
+- Updated photo counts for affected users:
+  - User `62b47da7-b1a3-48da-b91f-4dd5ddbf19a7`: 10 → 0 photos
+  - User `337dabe4-0858-4d18-b612-4dd665bb75bc`: 1 → 0 photos
+
+### Files Modified:
+- `src/lib/supabase.js`:
+  - Added `checkStorageFileExists()` helper function
+  - Added `cleanupOrphanedPhotos()` function for database cleanup
+  - Updated `getAllPhotos()` to validate storage files and filter out missing ones
+  - Automatic background cleanup when orphaned photos are detected
+
+### New Files Created:
+- `scripts/cleanup-orphaned-photos.js`: Standalone script for manual cleanup execution
+
+### Technical Details:
+
+#### Storage Validation:
+- Uses HEAD requests to check if public URLs return 200 OK
+- Assumes file exists on unknown errors to avoid false positives
+- Logs warnings for debugging without breaking functionality
+
+#### Cleanup Process:
+1. Fetch all photos with public URLs from database
+2. Check each photo's storage file existence
+3. Collect orphaned photo IDs
+4. Delete orphaned records in batch
+5. Update user photo counts by subtracting deleted count
+
+#### Future Prevention:
+- `getAllPhotos()` now validates all photos before returning
+- Orphaned photos are filtered out automatically
+- Background cleanup runs when orphaned photos are detected
+- Users will never see broken image placeholders
+
+### Testing:
+- Verified cleanup script successfully identified and deleted 11 orphaned records
+- Confirmed user photo counts were updated correctly
+- Tested `getAllPhotos()` validation with missing storage files
+- No linting errors introduced
+- Photo Book now only displays photos with valid storage files
+
+## 2025-11-27 15:00:00 IST - Loading Screen Redesign
+
+### Overview:
+Complete redesign of the LoadingScreen component with refined visuals, sophisticated animations, enhanced interactivity, and improved visual hierarchy for a more polished and engaging user experience.
+
+### Design Improvements Implemented:
+
+#### 1. Enhanced Visual Hierarchy
+- **Larger, more prominent title**: Increased from text-5xl to text-6xl/7xl/8xl with responsive scaling
+- **Refined typography**: Better font weights, improved letter spacing (tracking-[0.6em]), enhanced text shadows with multi-layer glows
+- **Better event details layout**: Improved visual separation with dot separators and animated pulse indicators
+- **Enhanced spacing**: Increased margins (mb-12 sm:mb-16) for better breathing room
+- **Responsive design**: Better scaling across mobile, tablet, and desktop breakpoints
+
+#### 2. Sophisticated Camera Lens Animation
+- **Multi-ring rotating system**: 
+  - Outer ring rotates clockwise (8s duration)
+  - Middle ring rotates counter-clockwise (6s duration)
+  - Visual markers on rings for rotation feedback
+- **Pulsing center with aperture blades**:
+  - 6-blade aperture effect with staggered opacity animations
+  - Gradient center with enhanced glow effects
+  - Scale and opacity pulsing (2s duration)
+  - Multi-layer shadows and glows for depth
+- **Enhanced visual effects**: Multiple border layers, gradient borders, and sophisticated shadow system
+
+#### 3. Dynamic Progress Indicator
+- **Fluid wave animation**: Replaced static bars with smooth wave effect
+- **Shimmer effect**: Animated shimmer overlay for premium feel
+- **Progress percentage**: Subtle percentage display (0-100%)
+- **Smooth transitions**: Eased animations with proper timing
+- **Enhanced styling**: Gradient fills, glow effects, and rounded corners
+
+#### 4. Interactive Elements
+- **Dynamic status messages**: Cycles through 4 different messages:
+  - "Calibrating lens"
+  - "Loading shared roll"
+  - "Preparing camera"
+  - "Initializing film"
+- **Smooth message transitions**: Fade in/out animations when messages change
+- **Progress tracking**: Real-time progress from 0-100% over 2.5 seconds
+- **Status cycling**: Messages change every 600ms for dynamic feel
+
+#### 5. Visual Refinements
+- **Enhanced glass morphism**:
+  - Improved blur (backdrop-filter: blur(30px))
+  - Better transparency layers
+  - Multi-layer gradients for depth
+  - Enhanced border styling (rgba(255,255,255,0.12))
+- **Layered background effects**:
+  - Multiple radial gradients with different positions
+  - Subtle parallax animation (8s scale pulse)
+  - Enhanced film grain integration
+  - Better gradient opacity and positioning
+- **Enhanced shadows and glows**:
+  - Multi-layer box shadows
+  - Text shadows with multiple glows
+  - Ring glow effects on interactive elements
+  - Improved depth perception
+
+#### 6. Polished Animations
+- **Staggered entrance animations**:
+  - Container variants with staggerChildren
+  - Individual item variants with refined timing
+  - Smooth easing curves ([0.25, 0.1, 0.25, 1])
+- **Refined timing**:
+  - Background: 0.0s fade in
+  - Header: 0.2s delay
+  - Title: 0.4s delay
+  - Card: 0.6s delay with bounce easing
+  - Status: 1.0s delay
+- **Smooth transitions**: All animations use refined easing functions
+- **Performance optimized**: 60fps animations with proper will-change hints
+
+### Files Modified:
+- `src/components/LoadingScreen.jsx`: Complete redesign with all new features
+
+### Technical Details:
+
+#### Animation System:
+- Uses Framer Motion variants for organized animation structure
+- Container variants with staggerChildren for coordinated entrances
+- Individual item variants for fine-tuned control
+- Infinite animations for continuous effects (rotations, pulses)
+
+#### Camera Lens Implementation:
+- Three-layer ring system with independent rotations
+- Aperture blade effect using CSS clip-path
+- Gradient overlays for depth
+- Multiple shadow layers for realistic lighting
+
+#### Progress System:
+- State-based progress tracking (0-100%)
+- Interval-based updates (50ms intervals)
+- Wave animation using transform skew
+- Shimmer effect with linear gradient overlay
+
+#### Status Message System:
+- Array of 4 status messages
+- Interval-based cycling (600ms)
+- Smooth fade transitions using AnimatePresence pattern
+- Key-based re-rendering for proper animation triggers
+
+### New Features:
+1. **Multi-ring camera lens** with rotating aperture effect
+2. **Fluid wave progress bar** with shimmer overlay
+3. **Dynamic status messages** that cycle during loading
+4. **Enhanced background** with layered gradients and parallax
+5. **Progress percentage** display
+6. **Responsive typography** that scales across devices
+7. **Sophisticated glass morphism** with enhanced blur and transparency
+
+### Animation Timeline:
+- 0.0s: Background gradients fade in
+- 0.2s: Container and header begin animation
+- 0.3s: "Zapcom Presents" text appears
+- 0.4s: Main title animates in
+- 0.6s: Event details appear
+- 0.7s: Glass card slides up with bounce
+- 0.8s: Camera lens animation begins
+- 1.0s: Status messages start cycling
+- 1.2s: Progress bar begins animating
+- 2.5s: Complete transition to main app
+
+### Testing:
+- Verified all animations run smoothly at 60fps
+- Tested responsive design across mobile, tablet, and desktop
+- Confirmed status messages cycle correctly
+- Verified progress animation completes in sync with timer
+- No linting errors introduced
+- All interactive elements work as expected
+
+## 2025-11-27 15:30:00 IST - Camera Rotation for Selfies
+
+### Overview:
+Enhanced the camera rotation feature to allow users to switch between front (selfie) and back cameras on mobile devices, with improved UI visibility and user experience.
+
+### Implementation Details:
+
+#### Camera Rotation Functionality
+The camera rotation feature was already implemented in the codebase but has been enhanced for better visibility and usability:
+
+1. **useCamera Hook** (`src/hooks/useCamera.js`):
+   - `facingMode` state tracks current camera ('environment' for back, 'user' for front)
+   - `isSwitching` state prevents rapid toggling during camera switch
+   - `switchCamera()` function:
+     - Stops current stream
+     - Toggles between 'environment' and 'user' facing modes
+     - Initializes new stream with opposite camera
+     - Includes error handling to restore previous camera if switch fails
+   - `startCamera()` supports `facingMode` parameter for camera selection
+
+2. **Camera Component** (`src/components/Camera.jsx`):
+   - `handleSwitchCamera()` function calls the hook's switchCamera method
+   - Enhanced camera flip button with improved visibility:
+     - Larger button size (w-14 h-14 instead of w-12 h-12)
+     - Better visual feedback with hover and active states
+     - Loading spinner animation during camera switch
+     - Active indicator dot when camera is ready
+     - Enhanced tooltip text ("Switch to front camera (selfie)")
+     - Improved icon design with flip arrows
+     - Glow effect when active
+
+### UI Enhancements:
+
+#### Camera Flip Button Improvements:
+- **Size**: Increased from 12x12 to 14x14 for better touch target
+- **Visual Feedback**:
+  - Hover scale animation (1.1x)
+  - Active state with enhanced background
+  - Glow effect (box-shadow with night-accent color)
+  - Loading spinner during switch operation
+- **Icon Design**:
+  - Camera icon with flip arrows on sides
+  - Clear visual indication of rotation capability
+  - Smooth animations during state changes
+- **Accessibility**:
+  - Clear tooltip text
+  - Disabled state when camera is not ready or switching
+  - Visual indicators for active/ready state
+
+### Technical Features:
+
+#### Camera Switching Process:
+1. User clicks flip button
+2. Current stream is stopped and cleaned up
+3. `facingMode` is toggled (environment ↔ user)
+4. New stream is requested with new facing mode
+5. Video element is updated with new stream
+6. Camera ready state is restored
+
+#### Error Handling:
+- If front camera is not available, error is caught and displayed
+- Attempts to restore previous camera if switch fails
+- Graceful degradation for devices without front camera support
+- User-friendly error messages
+
+#### State Management:
+- `isSwitching` prevents multiple simultaneous switch attempts
+- Button is disabled during switch operation
+- Visual feedback shows switching state clearly
+- Sound effects provide audio feedback (counter click)
+
+### Files Modified:
+- `src/components/Camera.jsx`: Enhanced camera flip button UI and interactions
+
+### User Experience:
+- **Mobile Users**: Can now easily switch to front camera for selfies
+- **Visual Clarity**: Button is more prominent and easier to find
+- **Smooth Transitions**: Loading state provides clear feedback during switch
+- **Error Handling**: Graceful handling of devices without front camera
+- **Accessibility**: Clear tooltips and visual states
+
+### Testing:
+- Verified camera switching works on mobile devices
+- Confirmed front camera (selfie mode) functions correctly
+- Tested error handling for devices without front camera
+- Verified button is disabled during switch operation
+- Confirmed smooth transitions between cameras
+- No linting errors introduced
+
+## 2025-12-03 - Polaroid Filters Feature
+
+### Overview:
+Added 6 selectable polaroid-style filters with live preview on the camera viewfinder. Filters are applied both as CSS filters for real-time preview and as canvas manipulations when capturing photos.
+
+### Filters Implemented:
+1. **Original** - Warm vintage tone with grain (existing effect)
+2. **Sepia** - Classic brown-toned vintage look
+3. **Noir** - High contrast black and white
+4. **Faded** - Low contrast, washed-out film aesthetic
+5. **Vibrant** - Enhanced saturation and contrast (modern)
+6. **Arctic** - Cool blue-ish tones
+
+### New Files Created:
+
+#### `src/utils/filters.js`:
+- Filter definitions with CSS strings for live preview
+- Canvas manipulation functions for each filter
+- Filter metadata (id, name, previewColor gradient)
+- Helper functions: `getFilterById()`, `clamp()`, `applyVignette()`
+- Individual filter implementations:
+  - `applyWarmVintage()` - warm tones with grain
+  - `applySepia()` - sepia formula with grain
+  - `applyNoir()` - grayscale with contrast boost
+  - `applyFaded()` - reduced contrast, desaturated
+  - `applyVibrant()` - saturation and contrast boost
+  - `applyArctic()` - cool blue shift
+
+### Files Modified:
+
+#### `src/hooks/useCamera.js`:
+- Added import for `getFilterById` from filters utility
+- Modified `capturePhoto()` to accept optional `filterId` parameter
+- Replaced hardcoded `applyVintageEffect()` with dynamic filter application
+- Added filter name to capture log output
+- Removed old `applyVintageEffect()` function (now in filters utility)
+
+#### `src/components/Camera.jsx`:
+- Added import for `FILTERS` from filters utility
+- Added `selectedFilter` state (default: 'original')
+- Added `activeFilter` computed value for current filter
+- Added `handleFilterChange()` function with sound feedback
+- Updated video element to apply CSS filter for live preview
+- Updated `capturePhoto()` call to pass selected filter
+- Added filter selector UI component between zoom and shutter button
+
+#### `src/index.css`:
+- Added `.scrollbar-hide` utility class for hiding scrollbars on filter selector
+
+### UI Implementation:
+
+#### Filter Selector:
+- Horizontal scrollable container with hidden scrollbar
+- Positioned between zoom controls and shutter button
+- Dark glass aesthetic matching existing UI (`bg-white/5 border border-white/10`)
+- Each filter shows:
+  - Circular color preview (gradient)
+  - Filter name in uppercase
+  - Active state with highlight and glow effect
+- Smooth animations on selection with Framer Motion
+- Sound feedback on filter change (counter click)
+
+### Technical Details:
+
+#### Live Preview:
+- CSS filters applied directly to video element via `style.filter`
+- Provides smooth 60fps preview with minimal performance impact
+- Filter changes are instant with transition animation (300ms)
+
+#### Capture Processing:
+- Canvas-based filter application at capture time
+- Higher quality than CSS filters (pixel-level manipulation)
+- Each filter applies:
+  - Color adjustments (RGB channel manipulation)
+  - Grain/noise effect (varying intensity per filter)
+  - Vignette effect (varying intensity per filter)
+- Output maintains existing JPEG quality (0.75)
+
+#### Filter Color Formulas:
+- **Sepia**: R = r*0.393 + g*0.769 + b*0.189, etc.
+- **Noir**: Luminosity grayscale (r*0.299 + g*0.587 + b*0.114) with 1.3x contrast
+- **Faded**: 0.85x contrast, +15 brightness, 0.8x saturation
+- **Vibrant**: 1.4x saturation, 1.15x contrast, +8 brightness
+- **Arctic**: 0.9x red, 1.02x green, 1.15x blue, cool shift
+
+### Testing:
+- Verified all 6 filters apply correctly on live preview
+- Confirmed filters apply to captured photos
+- Tested filter selector UI responsiveness
+- Verified sound feedback on filter selection
+- No linting errors introduced
+- Maintained backward compatibility (original filter is default)

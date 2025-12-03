@@ -176,7 +176,7 @@ export async function getUserPhotoCount(userId) {
 
 // Get all photos for the photo book
 export async function getAllPhotos() {
-  console.log('[getAllPhotos] Starting fetch - V2 NO JOIN');
+  console.log('[getAllPhotos] Starting fetch - V2 NO JOIN with storage validation');
   try {
     // Fetch photos first (NO JOIN - separate queries)
     console.log('[getAllPhotos] Fetching photos...');
@@ -197,8 +197,42 @@ export async function getAllPhotos() {
       return [];
     }
     
+    // Validate storage files exist - filter out photos with missing files
+    console.log('[getAllPhotos] Validating storage files...');
+    const validPhotos = [];
+    const orphanedIds = [];
+    
+    for (const photo of photosOnly) {
+      if (photo.public_url) {
+        const exists = await checkStorageFileExists(photo.public_url);
+        if (exists) {
+          validPhotos.push(photo);
+        } else {
+          console.warn(`[getAllPhotos] Photo ${photo.id} has missing storage file, filtering out`);
+          orphanedIds.push(photo.id);
+        }
+      } else {
+        // If no public_url, skip it
+        console.warn(`[getAllPhotos] Photo ${photo.id} has no public_url, filtering out`);
+        orphanedIds.push(photo.id);
+      }
+    }
+    
+    if (orphanedIds.length > 0) {
+      console.log(`[getAllPhotos] Found ${orphanedIds.length} photos with missing storage files`);
+      // Optionally clean up orphaned records in background (don't await)
+      cleanupOrphanedPhotos().catch(err => {
+        console.error('[getAllPhotos] Background cleanup failed:', err);
+      });
+    }
+    
+    if (validPhotos.length === 0) {
+      console.log('[getAllPhotos] No valid photos found after validation');
+      return [];
+    }
+    
     // Fetch user profiles separately
-    const userIds = [...new Set(photosOnly.map(p => p.user_id))];
+    const userIds = [...new Set(validPhotos.map(p => p.user_id))];
     console.log('[getAllPhotos] Fetching profiles for user IDs:', userIds);
     
     const { data: profiles, error: profilesError } = await supabase
@@ -211,7 +245,7 @@ export async function getAllPhotos() {
     if (profilesError) {
       console.error('[getAllPhotos] Error fetching profiles:', profilesError);
       // Return photos without profile data
-      return photosOnly.map(photo => ({
+      return validPhotos.map(photo => ({
         ...photo,
         users_profile: null
       }));
@@ -220,12 +254,12 @@ export async function getAllPhotos() {
     // Merge photos with profiles
     const profileMap = new Map((profiles || []).map(p => [p.id, p]));
     
-    const result = photosOnly.map(photo => ({
+    const result = validPhotos.map(photo => ({
       ...photo,
       users_profile: profileMap.get(photo.user_id) || null
     }));
     
-    console.log('[getAllPhotos] Returning', result.length, 'photos with profiles');
+    console.log('[getAllPhotos] Returning', result.length, 'valid photos with profiles');
     return result;
   } catch (err) {
     console.error('[getAllPhotos] Exception:', err);
@@ -247,6 +281,101 @@ export async function getUserPhotos(userId) {
   }
   
   return data || [];
+}
+
+// Check if a storage file exists by checking the public URL
+async function checkStorageFileExists(publicUrl) {
+  try {
+    // Use HEAD request to check if file exists without downloading
+    const response = await fetch(publicUrl, { method: 'HEAD' });
+    return response.ok;
+  } catch (error) {
+    console.warn('[checkStorageFileExists] Error checking file:', error.message);
+    // On error, assume file exists to avoid false positives
+    return true;
+  }
+}
+
+// Clean up orphaned photo records (photos where storage files are missing)
+export async function cleanupOrphanedPhotos() {
+  console.log('[cleanupOrphanedPhotos] Starting cleanup...');
+  try {
+    // Fetch all photos with public URLs
+    const { data: allPhotos, error: fetchError } = await supabase
+      .from('photos')
+      .select('id, user_id, storage_path, public_url');
+    
+    if (fetchError) {
+      console.error('[cleanupOrphanedPhotos] Error fetching photos:', fetchError);
+      return { success: false, error: fetchError.message };
+    }
+    
+    if (!allPhotos || allPhotos.length === 0) {
+      console.log('[cleanupOrphanedPhotos] No photos found');
+      return { success: true, deleted: 0 };
+    }
+    
+    console.log(`[cleanupOrphanedPhotos] Checking ${allPhotos.length} photos...`);
+    
+    // Check each photo's storage file
+    const orphanedIds = [];
+    const userPhotoCounts = new Map();
+    
+    for (const photo of allPhotos) {
+      const exists = await checkStorageFileExists(photo.public_url);
+      if (!exists) {
+        console.log(`[cleanupOrphanedPhotos] Orphaned photo found: ${photo.id} (${photo.storage_path})`);
+        orphanedIds.push(photo.id);
+        
+        // Track photo counts per user
+        const currentCount = userPhotoCounts.get(photo.user_id) || 0;
+        userPhotoCounts.set(photo.user_id, currentCount + 1);
+      }
+    }
+    
+    if (orphanedIds.length === 0) {
+      console.log('[cleanupOrphanedPhotos] No orphaned photos found');
+      return { success: true, deleted: 0 };
+    }
+    
+    // Delete orphaned records
+    console.log(`[cleanupOrphanedPhotos] Deleting ${orphanedIds.length} orphaned records...`);
+    const { error: deleteError } = await supabase
+      .from('photos')
+      .delete()
+      .in('id', orphanedIds);
+    
+    if (deleteError) {
+      console.error('[cleanupOrphanedPhotos] Error deleting orphaned photos:', deleteError);
+      return { success: false, error: deleteError.message };
+    }
+    
+    // Update user photo counts
+    console.log('[cleanupOrphanedPhotos] Updating user photo counts...');
+    for (const [userId, deletedCount] of userPhotoCounts.entries()) {
+      // Get current count
+      const { data: profile, error: profileError } = await supabase
+        .from('users_profile')
+        .select('photo_count')
+        .eq('id', userId)
+        .single();
+      
+      if (!profileError && profile) {
+        const newCount = Math.max(0, (profile.photo_count || 0) - deletedCount);
+        await supabase
+          .from('users_profile')
+          .update({ photo_count: newCount })
+          .eq('id', userId);
+        console.log(`[cleanupOrphanedPhotos] Updated user ${userId} count: ${profile.photo_count} -> ${newCount}`);
+      }
+    }
+    
+    console.log(`[cleanupOrphanedPhotos] Cleanup complete. Deleted ${orphanedIds.length} orphaned records.`);
+    return { success: true, deleted: orphanedIds.length };
+  } catch (error) {
+    console.error('[cleanupOrphanedPhotos] Exception:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 // Delete a photo
