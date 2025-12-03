@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCamera } from '../hooks/useCamera';
 import { createPhotoStorage } from '../utils/storage';
 import { cameraSounds } from '../utils/sounds';
-import { FILTERS } from '../utils/filters';
 import { PhotoCounter } from './PhotoCounter';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -36,7 +35,6 @@ export function Camera({ onViewGallery, onViewPhotoBook }) {
   const [isFlashReady, setIsFlashReady] = useState(true);
   const [showPermission, setShowPermission] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [selectedFilter, setSelectedFilter] = useState('original');
   const [showInfoCard, setShowInfoCard] = useState(false);
   const [showRollPrompt, setShowRollPrompt] = useState(false);
   const [uploadStatus, setUploadStatus] = useState({
@@ -104,8 +102,8 @@ export function Camera({ onViewGallery, onViewPhotoBook }) {
       cameraSounds.playFlashFire();
       cameraSounds.playShutterClick();
 
-      const photoData = capturePhoto(selectedFilter);
-      console.log('[Camera] Photo captured, data length:', photoData?.length, 'filter:', selectedFilter);
+      const photoData = capturePhoto();
+      console.log('[Camera] Photo captured, data length:', photoData?.length);
 
       if (photoData) {
         // Set uploading status
@@ -202,12 +200,6 @@ export function Camera({ onViewGallery, onViewPhotoBook }) {
 
   const takenCount = 10 - remaining;
   const zoomScale = zoomLevel === 0.5 ? 0.88 : zoomLevel === 2 ? 1.25 : 1;
-  const activeFilter = FILTERS.find(f => f.id === selectedFilter) || FILTERS[0];
-
-  const handleFilterChange = (filterId) => {
-    setSelectedFilter(filterId);
-    cameraSounds.playCounterClick();
-  };
 
   let statusMessage = 'Ready';
   if (uploadStatus.status === 'uploading') {
@@ -281,11 +273,8 @@ export function Camera({ onViewGallery, onViewPhotoBook }) {
               autoPlay
               playsInline
               muted
-              style={{ 
-                transform: `scale(${zoomScale})`,
-                filter: activeFilter.css
-              }}
-              className="w-full h-full object-cover transition-all duration-300 ease-out"
+              style={{ transform: `scale(${zoomScale})` }}
+              className="w-full h-full object-cover transition-transform duration-300 ease-out"
             />
             <div className="absolute inset-0 film-grain pointer-events-none" />
             <div className="absolute inset-0 vignette pointer-events-none" />
@@ -445,7 +434,6 @@ export function Camera({ onViewGallery, onViewPhotoBook }) {
               <PhotoCounter remaining={remaining} />
 
               <div className="flex flex-col items-center gap-4">
-                {/* Zoom Controls */}
                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm uppercase tracking-[0.4em]">
                   {zoomOptions.map((option) => (
                     <button
@@ -455,38 +443,6 @@ export function Camera({ onViewGallery, onViewPhotoBook }) {
                     >
                       {option === 1 ? '1x' : option}
                     </button>
-                  ))}
-                </div>
-
-                {/* Filter Selector */}
-                <div className="flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 border border-white/10 overflow-x-auto max-w-[280px] scrollbar-hide">
-                  {FILTERS.map((filter) => (
-                    <motion.button
-                      key={filter.id}
-                      onClick={() => handleFilterChange(filter.id)}
-                      whileTap={{ scale: 0.9 }}
-                      className={`relative flex flex-col items-center gap-1 px-2 py-1 rounded-xl transition-all duration-200 ${
-                        selectedFilter === filter.id 
-                          ? 'bg-white/15' 
-                          : 'hover:bg-white/5'
-                      }`}
-                    >
-                      <div 
-                        className={`w-8 h-8 rounded-full border-2 transition-all duration-200 ${
-                          selectedFilter === filter.id 
-                            ? 'border-night-accent shadow-[0_0_8px_rgba(154,240,255,0.4)]' 
-                            : 'border-white/20'
-                        }`}
-                        style={{ background: filter.previewColor }}
-                      />
-                      <span className={`text-[9px] uppercase tracking-wider whitespace-nowrap ${
-                        selectedFilter === filter.id 
-                          ? 'text-white' 
-                          : 'text-white/50'
-                      }`}>
-                        {filter.name}
-                      </span>
-                    </motion.button>
                   ))}
                 </div>
 
